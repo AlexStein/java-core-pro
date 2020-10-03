@@ -1,22 +1,53 @@
 package race;
 
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.locks.ReentrantLock;
+
 public class MainClass {
     public static final int CARS_COUNT = 4;
 
-    public static void main(String[] args) {
+    private static final CyclicBarrier starterBarrier = new CyclicBarrier(MainClass.CARS_COUNT + 1);
+    private static final CountDownLatch finishLatch = new CountDownLatch(MainClass.CARS_COUNT);
+
+    // Комната победителя, все про нее знают и могут войти
+    public static ReentrantLock winLock = new ReentrantLock();
+
+    public static void main(String[] args)  {
         System.out.println("ВАЖНОЕ ОБЪЯВЛЕНИЕ >>> Подготовка!!!");
+
         Race race = new Race(new Road(60), new Tunnel(), new Road(40));
         Car[] cars = new Car[CARS_COUNT];
 
         for (int i = 0; i < cars.length; i++) {
             cars[i] = new Car(race, 20 + (int) (Math.random() * 10));
+
+            // Машинаем раздаем регламент гонок:
+            // что делать когда будешь готов
+            // что делать когда пересечешь финиш
+            cars[i].setStarterBarrier(starterBarrier);
+            cars[i].setFinishLatch(finishLatch);
         }
 
         for (int i = 0; i < cars.length; i++) {
             new Thread(cars[i]).start();
         }
 
+        try {
+            // Ждем когда все машины будут готовы + судья
+            starterBarrier.await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            e.printStackTrace();
+        }
         System.out.println("ВАЖНОЕ ОБЪЯВЛЕНИЕ >>> Гонка началась!!!");
+
+        try {
+            // Ждем когда все пересекут линию финиша
+            finishLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         System.out.println("ВАЖНОЕ ОБЪЯВЛЕНИЕ >>> Гонка закончилась!!!");
     }
 }
